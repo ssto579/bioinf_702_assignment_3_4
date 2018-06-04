@@ -4,12 +4,14 @@ library(phytools)
 library(mvMORPH)
 library(stats4)
 library(bbmle)
+library(geiger)
 
 
 
 my_AIC <- function(k, log_lik) {
 	return ( 2 * (k - log_lik) )
 	}
+
 	
 my_AICc <- function(k, n, log_lik) {
 	return (my_AIC(k, log_lik) + ( 2*k^2 + 2*k)/(n-k-1))
@@ -32,15 +34,19 @@ neg_yule <-function(birth) {
 
 	}
 	
-neg_birthdeath <-function(birth, death) {
-	sqTree<-read.nexus("squamate.tre")
-	the_tree = sqTree
-	return (-1 * log_birth_death(birth, death, the_tree, yule=FALSE))
+neg_birthdeath <-function(params, the_tree_name) {
+	birth = params[1]
+	death = params[2]
+	neg_log =  (-1 * log_birth_death(birth, death, the_tree_name, yule=FALSE))
+#	cat(paste0("birth=", birth, "\ndeath=", death, ", neg_log=", neg_log, "\n"))
+	
+	return(neg_log)
 
 	}
 	
 log_birth_death <- function(birth, death, the_tree, yule=FALSE)
 {
+	if (death >= birth) { return (-1*10^(8) ) }
 	#sources for birthdeath:
 	#Nee, S.C. & May, Robert & Harvey, P.H.. (1994). The Reconstructed Evolutionary Process. Philosophical transactions of the Royal Society of London. Series B, Biological sciences. 344. 305-11. 10.1098/rstb.1994.0068. 
 	#
@@ -75,6 +81,10 @@ log_birth_death <- function(birth, death, the_tree, yule=FALSE)
 
 	log_likelihood = lfactorial(num_species -1) + (num_species - 2) * log(r) + r  * sum(branching_times[3:num_species]) + log(1 - a) - 2 * sum( log ( exp (r * branching_times[2:num_species]) - a) ) 
 	#actual log likelihood
+	
+	if (log_likelihood == -1*Inf) {
+		log_likelihood = -1* 10^(-8)
+		}
  
  return (log_likelihood)
   }
@@ -103,7 +113,7 @@ log_birth_death <- function(birth, death, the_tree, yule=FALSE)
 		#covar_matrix = covariance matrix: phylogenetic variance and covariance given length of tree branches
 		
 		if (model == "kappa") {
-			new_tree = kappaTree(phy, extra) # modifies the kappa tree
+			tree = kappaTree(tree, extra) # modifies the  tree to kappa
 		}
 		
 		covar_matrix = vcv(phy = tree, corr=FALSE)*rate
@@ -129,7 +139,9 @@ log_birth_death <- function(birth, death, the_tree, yule=FALSE)
 		part_c = t(part_a) %*% part_b%*%part_a
 		part_c = part_c[1,1] # part c is a 1*n atrix times an n*n matrix times an n*1 matrix is a 1*1 matrix. It should be interpreted as a scalar, not a matrix, so I take the value and `convert' it to a scalar
 		final = exp((-1/2)*part_c)/( sqrt( (2*pi)^n * det(covar_matrix) ) ) # is likelihood
-		return(log(final)) # converts to log likelihood
+		log_final = log(final)
+		if (!is.finite(log_final)) {log_final = -1*10^8}
+		return(log_final) # converts to log likelihood
 		}
 
 sqTree<-read.nexus("squamate.tre")
@@ -138,42 +150,78 @@ the_tree = sqTree
 print(birthdeath(the_tree)) # built in estimate
 
 
-log_yule = mle(neg_yule, start = list(birth=0.01)  )
-
-print(log_yule)
-
-#log_yule2 = mle(neg_yule_old, start = list(birth=0.01, the_tree_name=the_tree) , fixed=(the_tree_name=the_tree) )
-
-"
-Error in mle(neg_yule_old, start = list(birth = 0.01, the_tree_name = the_tree),  :
-  some named arguments in 'fixed' are not arguments to the supplied log-likelihood
-Execution halted
-"
+print(log_birth_death(0.65, 0.050, the_tree))
 
 
-#log_birthdeath = mle(neg_birthdeath, start = list(birth=0.01, death = 0.00)  )
+optim_result_yule = optim(par=1, fn=neg_yule_old, method=c("L-BFGS-B"), lower=c(0.00000001), upper=c(1000), the_tree_name=the_tree)
+print(optim_result_yule)
 
-"
-Error in optim(start, f, method = method, hessian = TRUE, ...) :
-  non-finite finite-difference value [1]
-Calls: mle -> optim
-In addition: There were 50 or more warnings (use warnings() to see the first 50)
-Execution halted
-"
+optim_result_birth_death = optim(par=c(.000001,.0), fn=neg_birthdeath, method=c("L-BFGS-B"), lower=c(0.00000001, 0), upper=c(0.05, 0.04), the_tree_name=the_tree)
+print(optim_result_birth_death)
+
+print(log_birth_death(0.0208967314397861, 0.0200000201611449, the_tree))
 
 
+neg_log_brownian <- function( params, tree, trait_values, model) {
+#	print('start')
+	beginning_mean = params[1]
+	rate = params[2]
+	extra = params[3]
+#	print(beginning_mean)
+	#print(rate)
+#	print(extra)
+	
+	
+	log_likelihood = log_brownian(beginning_mean, rate, tree, trait_values, model, extra)
+	
+#	print(log_likelihood)
+#	cat(paste0("beginning_mean=", beginning_mean, "\nrate=", rate, ", \nextra=", extra, , "\nlog_likeihood" = log_likelihood, "\n\n"))
+	return (-1 * log_likelihood)
+	}
+
+tr  = "(((x1:1.5,x2:1.5):1.0,(x3:0.5,x4:0.5):2.0):1.0,x5:3.5);"
+tr2 = read.tree(file="", text=tr)
+
+fake_data = c(5.2, 5.5, 8.7, 7.2, 9)
+
+optim_result_neutral = optim( par = c(10 , .5, .9), fn = neg_log_brownian, method=c("L-BFGS-B"), lower = c(10^(-3),10^(-3),10), upper = c(1000, 1000, 1000), tree = tr2, trait_values = fake_data, model='neutral')
+
+optim_result_lambda = optim( par = c(10 , .5, .9), fn = neg_log_brownian, method=c("L-BFGS-B"), lower = c(10^(-3),10^(-3),0), upper = c(1000, 1000, 1000), tree = tr2, trait_values = fake_data, model='lambda')
+
+optim_result_delta = optim( par = c(10 , .5, .9), fn = neg_log_brownian, method=c("L-BFGS-B"), lower = c(10^(-3),10^(-3),10^(-3)), upper = c(1000, 1000, 1000), tree = tr2, trait_values = fake_data, model='delta')
+optim_result_kappa = optim( par = c(10 , .5, .9), fn = neg_log_brownian, method=c("L-BFGS-B"), lower = c(10^(-3),10^(-3),0), upper = c(1000, 1000, 1000), tree = tr2, trait_values = fake_data, model='kappa')
+new_list = c(optim_result_neutral$value, optim_result_lambda$value, optim_result_delta$value, optim_result_kappa$value)
 
 
 
-log_yule = mle2(neg_yule_old ,method = "BFGS",  start = list(birth=0.01, the_tree_name=the_tree), fixed =  list(the_tree_name=the_tree) )
+#print(optim_result_neutral)
+#print(optim_result_lambda)
+#print(optim_result_delta)
+#print(optim_result_kappa)
+#
+#
+#for ( i in 1:4) {
+#	result = new_list[i]
+#	k =3
+#	n= 5
+#	log_lik = result*-1
+#	print(log_lik)
+#	if (i==1) {k = 2}
+#	print(i)
+#	print(my_AIC(k , log_lik))
+#	print(my_AICc(k , n, log_lik))
+#	print(my_BIC(k , n, log_lik))
+#	
+#	print('\n')
+#	}
 
-"
-Error in mle2(neg_yule_old, method = "BFGS", start = list(birth = 0.01,  :
-  some named arguments in 'fixed' are not arguments to the specified log-likelihood function
-Execution halted
-"
-
-
-print(log_yule)
-print(log_birth_death)
-print(birthdeath)
+A = c(1,2)
+B = c(-71.77891, 1317.091)
+for (i in 1:2) {
+k = A[i]
+log_lik = B[i]
+n = 258
+print(my_AIC(k , log_lik))
+print(my_AICc(k , n, log_lik))
+print(my_BIC(k , n, log_lik))
+}
