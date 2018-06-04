@@ -79,7 +79,7 @@ log_birth_death <- function(birth, death, the_tree, yule=FALSE)
 #				
 #original function from ape | birthdeath function
 
-	log_likelihood = lfactorial(num_species -1) + (num_species - 2) * log(r) + r  * sum(branching_times[3:num_species]) + log(1 - a) - 2 * sum( log ( exp (r * branching_times[2:num_species]) - a) ) 
+	log_likelihood = lfactorial(num_species -1) + (num_species - 2) * log(r) + r  * sum(branching_times[3:num_species]) + num_species*log(1 - a) - 2 * sum( log ( exp (r * branching_times[2:num_species]) - a) ) 
 	#actual log likelihood
 	
 	if (log_likelihood == -1*Inf) {
