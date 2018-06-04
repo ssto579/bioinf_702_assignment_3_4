@@ -29,7 +29,7 @@ log_birth_death <- function(birth, death, the_tree)
 	
 	# birth is birth rate
 	# death is death rate
-	# the_tree is well, the tree.
+	# the_tree is well, the tree that needs to be computed on.
 	num_species <- length(the_tree$tip.label) # number of species = number of species names
 	branching_times <- c(NA, branching.times(the_tree)) # add Not Available to beginning
 
@@ -48,28 +48,13 @@ log_birth_death <- function(birth, death, the_tree)
 #				
 #original function from ape | birthdeath function
 
-	log_likelihood = lfactorial(num_species -1) + (num_species - 2) * log(r) + r  * sum(branching_times[3:num_species]) + log(1 - a) - 2 * sum( log ( exp (r * branching_times[2:num_species]) - a) ) 
+	log_likelihood = lfactorial(num_species -1) + (num_species - 2) * log(r) + r  * sum(branching_times[3:num_species]) + num_species*log(1 - a) - 2 * sum( log ( exp (r * branching_times[2:num_species]) - a) ) 
 	#actual log likelihood
  
  return (log_likelihood)
   }
   
   
-known_result =  birthdeath(the_tree) # testing if is tree
-print("result from ape's ML")
-print(known_result)
-# this gives birth-death and death/birth for maximum likelihood, and the log likelyhood
-
-# calculated the birth and death rates, see if my function gives the same likelihood
-thing = log_birth_death (.02103298, 0, the_tree)
-print("my result, with their peramiters")
-print(thing)
- # it does
- 
-
- 
- 
- 
 # brownian motion
 # 
 
@@ -89,7 +74,6 @@ print(thing)
 		
 		# n is number of species
 		
-		#n = num_traits = 
 		#x is vector of trait values
 		n = length(trait_values)
 #		print(rate)
@@ -109,6 +93,31 @@ print(thing)
 		final = exp((-1/2)*part_c)/( sqrt( (2*pi)^n * det(covar_matrix) ) ) # is likelihood
 		return(log(final)) # converts to log likelihood
 		}
+
+
+
+
+
+
+
+
+
+
+known_result =  birthdeath(the_tree) # testing if is tree
+print("result from ape's ML")
+print(known_result)
+# this gives birth-death and death/birth for maximum likelihood, and the log likelyhood
+
+# calculated the birth and death rates, see if my function gives the same likelihood
+thing = log_birth_death (.02103298, 0, the_tree)
+print("my result, with their peramiters")
+print(thing)
+ # it does
+ 
+
+ 
+ 
+ 
 
 
 tr  = "((x1:1.5,x2:1.5):1.0,(x3:0.5,x4:0.5):2.0);"
@@ -133,3 +142,45 @@ print(log_brownian(6.4875, 0.9925, tr2, fake_data))
 # mvBM ; from mvMORPH
 #matches
 #ace was doing something weird
+
+birth_rates = seq (0.001,0.05,by =0.001 )
+log_birth_death = sapply(birth_rates, function(x) log_birth_death(x, 0, the_tree) )
+# mean is at 0.021. After looking at exp(log_brown_sequence), I guesstimated that likeliest ponts were between 0.017, 0.026
+plot(birth_rates, log_birth_death)
+#octave/matlab 
+
+#hold on
+#plot(birth_rates,log_birth_death)
+#plot(0.021, log_birth_death(21), 'rx')
+#plot([0.017,0.017],[-700, -0], 'g--')
+#plot([0.026,0.026],[-700, -0], 'g--')
+#legend('log likelihood', 'best estimate', 'confidence interval', 'confidence interval','Location', 'northeast')
+#xlabel('birth-death')
+#ylabel('log likelihood')
+#title('Birth-Death log likelihood')
+
+
+
+
+
+means = seq (0,10,.1)
+log_brown_sequence = sapply(means, function(x) log_brownian(x, 0.9925, tr2, fake_data) )
+plot(means, log_brown_sequence)
+
+
+# mean is at 6.5. After looking at exp(log_brown_sequence), I guesstimated that likeliest ponts were between 4, 9
+
+# octave/ matlab code, since plot didn't work for me in R for some reason
+
+
+
+#hold on
+#plot(means,log_brown_sequence)
+#plot(6.5, log_brown_sequence(66), 'rx')
+#plot([4,4],[-30, -5], 'g--')
+#plot([9,9],[-30, -5], 'g--')
+#legend('log likelihood', 'best estimate', 'confidence interval', 'confidence interval','Location', 'northwest')
+#xlabel('root value')
+#ylabel('log likelihood')
+#title('Brownian motion log likelihood')
+
