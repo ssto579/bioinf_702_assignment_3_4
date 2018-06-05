@@ -8,20 +8,6 @@ library(geiger)
 
 
 
-my_AIC <- function(k, log_lik) {
-	return ( 2 * (k - log_lik) )
-	}
-
-	
-my_AICc <- function(k, n, log_lik) {
-	return (my_AIC(k, log_lik) + ( 2*k^2 + 2*k)/(n-k-1))
-	}
-	
-my_BIC <- function (k, n, log_lik) {
-	return ( log(n) * k - 2*log_lik )
-	}
-
-
 	
  neg_yule_old <-function(birth, the_tree_name) {
 	return (-1 * log_birth_death(birth, 0, the_tree_name, yule=TRUE))
